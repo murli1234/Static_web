@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    environment {
+        TAG = 'latest'
+        IMAGE_NAME = 'static-web-app'
+        Dockerhubregistryname = 'murli14/static_web'
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git(
+                    url: "https://github.com/murli1234/Static_web.git",
+                    branch: 'main',
+                    credentialsId: 'github_token' // if repo is private
+                )
+            }
+        }
+      
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:${TAG} .'
+                sh 'docker tag ${IMAGE_NAME}:${TAG} ${Dockerhubregistryname}:${TAG}'
+            }
+        }
+     stage('Run Container') {
+    steps {
+        sh '''
+            docker rm -f web-app || true
+            docker run -d --name web-app -p 81:80 static-web-app:latest
+        '''
+    }
+}
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'Dockerhub_token', 
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${Dockerhubregistryname}:${TAG}
+                    '''
+                }
+            }
+        }
+    }
+}
